@@ -212,7 +212,7 @@ func (transport VirtioTransport) disableModern(config *Config, disable bool) str
 		return "disable-modern=true"
 	}
 
-	return "disable-modern=false"
+	return "disable-legacy=on"
 }
 
 // ObjectType is a string representing a qemu object type.
@@ -409,7 +409,6 @@ func (object Object) QemuParams(config *Config) []string {
 		qemuParams = append(qemuParams, "-drive")
 		qemuParams = append(qemuParams, strings.Join(driveParams, ","))
 	}
-
 	return qemuParams
 }
 
@@ -497,6 +496,8 @@ type FSDevice struct {
 	// Multidev is the filesystem behaviour to deal
 	// with multiple devices being shared with a 9p export
 	Multidev Virtio9PMultidev
+
+	IommuPlatform bool
 }
 
 // Virtio9PTransport is a map of the virtio-9p device name that corresponds
@@ -536,6 +537,9 @@ func (fsdev FSDevice) QemuParams(config *Config) []string {
 			deviceParams = append(deviceParams, "iommu_platform=on")
 		}
 		deviceParams = append(deviceParams, fmt.Sprintf("devno=%s", fsdev.DevNo))
+	}
+	if fsdev.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
 	}
 
 	fsParams = append(fsParams, string(fsdev.FSDriver))
@@ -857,6 +861,8 @@ type NetDevice struct {
 
 	// Transport is the virtio transport for this device.
 	Transport VirtioTransport
+
+	IommuPlatform bool
 }
 
 // VirtioNetTransport is a map of the virtio-net device name that corresponds
@@ -919,7 +925,9 @@ func (netdev NetDevice) QemuDeviceParams(config *Config) []string {
 	deviceParams = append(deviceParams, fmt.Sprintf("driver=%s", driver))
 	deviceParams = append(deviceParams, fmt.Sprintf("netdev=%s", netdev.ID))
 	deviceParams = append(deviceParams, fmt.Sprintf("mac=%s", netdev.MACAddress))
-
+	if netdev.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
+	}
 	if netdev.Bus != "" {
 		deviceParams = append(deviceParams, fmt.Sprintf("bus=%s", netdev.Bus))
 	}
@@ -1089,6 +1097,8 @@ type SerialDevice struct {
 
 	// MaxPorts is the maximum number of ports for this device.
 	MaxPorts uint
+
+	IommuPlatform bool
 }
 
 // Valid returns true if the SerialDevice structure is valid and complete.
@@ -1122,6 +1132,9 @@ func (dev SerialDevice) QemuParams(config *Config) []string {
 			deviceParams = append(deviceParams, "iommu_platform=on")
 		}
 		deviceParams = append(deviceParams, fmt.Sprintf("devno=%s", dev.DevNo))
+	}
+	if dev.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
 	}
 
 	qemuParams = append(qemuParams, "-device")
@@ -1204,6 +1217,8 @@ type BlockDevice struct {
 
 	// Transport is the virtio transport for this device.
 	Transport VirtioTransport
+
+	IommuPlatform bool
 }
 
 // VirtioBlockTransport is a map of the virtio-blk device name that corresponds
@@ -1237,7 +1252,9 @@ func (blkdev BlockDevice) QemuParams(config *Config) []string {
 	if !blkdev.SCSI {
 		deviceParams = append(deviceParams, "scsi=off")
 	}
-
+	if blkdev.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
+	}
 	if !blkdev.WCE {
 		deviceParams = append(deviceParams, "config-wce=off")
 	}
@@ -1801,6 +1818,8 @@ type SCSIController struct {
 
 	// Transport is the virtio transport for this device.
 	Transport VirtioTransport
+
+	IommuPlatform bool
 }
 
 // SCSIControllerTransport is a map of the virtio-scsi device name that
@@ -1831,6 +1850,9 @@ func (scsiCon SCSIController) QemuParams(config *Config) []string {
 	}
 	if s := scsiCon.Transport.disableModern(config, scsiCon.DisableModern); s != "" {
 		deviceParams = append(deviceParams, s)
+	}
+	if scsiCon.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
 	}
 	if scsiCon.IOThread != "" {
 		deviceParams = append(deviceParams, fmt.Sprintf("iothread=%s", scsiCon.IOThread))
@@ -2085,6 +2107,8 @@ type RngDevice struct {
 	DevNo string
 	// Transport is the virtio transport for this device.
 	Transport VirtioTransport
+
+	IommuPlatform bool
 }
 
 // RngDeviceTransport is a map of the virtio-rng device name that corresponds
@@ -2117,6 +2141,10 @@ func (v RngDevice) QemuParams(config *Config) []string {
 
 	if v.Transport.isVirtioPCI(config) && v.ROMFile != "" {
 		deviceParams = append(deviceParams, fmt.Sprintf("romfile=%s", v.ROMFile))
+	}
+
+	if v.IommuPlatform {
+		deviceParams = append(deviceParams, "iommu_platform=on")
 	}
 
 	if v.Transport.isVirtioCCW(config) {

@@ -377,13 +377,19 @@ func (q *qemuArchBase) appendConsole(_ context.Context, devices []govmmQemu.Devi
 			{"console", "ttyS0"},
 		}
 	} else {
+		var iommu_platform bool
+		iommu_platform = false
+		if q.guestProtection() == sevProtection {
+			iommu_platform = true
+		}
+
 		serial = govmmQemu.SerialDevice{
 			Driver:        govmmQemu.VirtioSerial,
 			ID:            "serial0",
 			DisableModern: q.nestedRun,
 			MaxPorts:      uint(2),
+			IommuPlatform: iommu_platform,
 		}
-
 		console = govmmQemu.CharDevice{
 			Driver:   govmmQemu.Console,
 			Backend:  govmmQemu.Socket,
@@ -494,6 +500,9 @@ func genericSCSIController(enableIOThreads, nestedRun bool) (govmmQemu.SCSIContr
 
 func (q *qemuArchBase) appendSCSIController(_ context.Context, devices []govmmQemu.Device, enableIOThreads bool) ([]govmmQemu.Device, *govmmQemu.IOThread, error) {
 	d, t := genericSCSIController(enableIOThreads, q.nestedRun)
+	if q.guestProtection() == sevProtection {
+		d.IommuPlatform = true
+	}
 	devices = append(devices, d)
 	return devices, t, nil
 }
@@ -508,7 +517,6 @@ func generic9PVolume(volume types.Volume, nestedRun bool) govmmQemu.FSDevice {
 	if len(devID) > maxDevIDSize {
 		devID = devID[:maxDevIDSize]
 	}
-
 	return govmmQemu.FSDevice{
 		Driver:        govmmQemu.Virtio9P,
 		FSDriver:      govmmQemu.Local,
@@ -532,6 +540,10 @@ func (q *qemuArchBase) append9PVolume(_ context.Context, devices []govmmQemu.Dev
 	}
 
 	d, err := genericAppend9PVolume(devices, volume, q.nestedRun)
+	if q.guestProtection() == sevProtection {
+		d.IommuPlatform = true
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -640,6 +652,9 @@ func genericNetwork(endpoint Endpoint, vhost, nestedRun bool, index int) (govmmQ
 
 func (q *qemuArchBase) appendNetwork(_ context.Context, devices []govmmQemu.Device, endpoint Endpoint) ([]govmmQemu.Device, error) {
 	d, err := genericNetwork(endpoint, q.vhost, q.nestedRun, q.networkIndex)
+	if q.guestProtection() == sevProtection {
+		d.IommuPlatform = true
+	}
 	if err != nil {
 		return devices, fmt.Errorf("Failed to append network %v", err)
 	}
@@ -672,6 +687,9 @@ func genericBlockDevice(drive config.BlockDrive, nestedRun bool) (govmmQemu.Bloc
 
 func (q *qemuArchBase) appendBlockDevice(_ context.Context, devices []govmmQemu.Device, drive config.BlockDrive) ([]govmmQemu.Device, error) {
 	d, err := genericBlockDevice(drive, q.nestedRun)
+	if q.guestProtection() == sevProtection {
+		d.IommuPlatform = true
+	}
 	if err != nil {
 		return devices, fmt.Errorf("Failed to append block device %v", err)
 	}
@@ -731,7 +749,6 @@ func (q *qemuArchBase) appendRNGDevice(_ context.Context, devices []govmmQemu.De
 			Filename: rngDev.Filename,
 		},
 	)
-
 	return devices, nil
 }
 

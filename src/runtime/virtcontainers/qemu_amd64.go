@@ -148,6 +148,7 @@ func newQemuArch(config HypervisorConfig) (qemuArch, error) {
 			return nil, err
 		}
 
+		hvLogger.WithField("subsystem", "qemuAmd64").Warn("dong enter confidential guest")
 		if !q.qemuArchBase.disableNvdimm {
 			hvLogger.WithField("subsystem", "qemuAmd64").Warn("Nvdimm is not supported with confidential guest, disabling it.")
 			q.qemuArchBase.disableNvdimm = true
@@ -249,8 +250,9 @@ func (q *qemuAmd64) enableProtection() error {
 		if q.qemuMachine.Options != "" {
 			q.qemuMachine.Options += ","
 		}
-		q.qemuMachine.Options += "confidential-guest-support=sev"
-		logger.Info("Enabling SEV guest protection")
+		q.qemuMachine.Options += "memory-encryption=sev0"
+		// logger.Warning("Enabling SEV guest protection")
+		hvLogger.WithField("subsystem", "qemuAmd64").Warn("Enabling SEV guest protection")
 		return nil
 
 	// TODO: Add support for other x86_64 technologies
@@ -320,7 +322,7 @@ func (q *qemuAmd64) appendSEVObject(devices []govmmQemu.Device, firmware, firmwa
 		return append(devices,
 			govmmQemu.Object{
 				Type:            govmmQemu.SEVGuest,
-				ID:              "sev",
+				ID:              "sev0",
 				Debug:           false,
 				File:            firmware,
 				CBitPos:         cpuid.AMDMemEncrypt.CBitPosition,
